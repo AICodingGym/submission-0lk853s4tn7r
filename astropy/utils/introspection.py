@@ -8,6 +8,11 @@ import types
 import importlib
 from distutils.version import LooseVersion
 
+try:
+    from packaging import version as packaging_version
+except ImportError:
+    packaging_version = None
+
 
 __all__ = ['resolve_name', 'minversion', 'find_current_module',
            'isinstancemethod']
@@ -139,10 +144,24 @@ def minversion(module, version, inclusive=True, version_path='__version__'):
     else:
         have_version = resolve_name(module.__name__, version_path)
 
-    if inclusive:
-        return LooseVersion(have_version) >= LooseVersion(version)
+    # Use packaging.version if available for more robust version comparison,
+    # otherwise fall back to LooseVersion
+    if packaging_version is not None:
+        try:
+            have_version_obj = packaging_version.parse(str(have_version))
+            version_obj = packaging_version.parse(str(version))
+        except Exception:
+            # Fall back to LooseVersion if parsing fails
+            have_version_obj = LooseVersion(have_version)
+            version_obj = LooseVersion(version)
     else:
-        return LooseVersion(have_version) > LooseVersion(version)
+        have_version_obj = LooseVersion(have_version)
+        version_obj = LooseVersion(version)
+
+    if inclusive:
+        return have_version_obj >= version_obj
+    else:
+        return have_version_obj > version_obj
 
 
 def find_current_module(depth=1, finddiff=False):
